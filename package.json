@@ -1,5 +1,9 @@
 {
   "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env index.js",
+    "start": "node index.js"
+  },
   "dependencies": {
     "telegraf": "^4.16.3"
   }
