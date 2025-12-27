@@ -1,4 +1,5 @@
 import { Telegraf } from "telegraf";
+import { askGemini } from "./ai.js";
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -18,6 +19,8 @@ bot.command("weather", async (ctx) => {
     return ctx.reply("Usage: /weather <city>\nExample: /weather London");
   }
   try {
+    await ctx.replyWithChatAction("typing");
+    
     // Geocoding: city -> lat/lon, to set param api call
     const geoRes = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
@@ -80,3 +83,39 @@ console.log("🤖 Bot is running...");
 // graceful stop
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
+
+// Gemini AI
+bot.on("text", async (ctx) => {
+  const text = ctx.message.text.trim();
+
+  // Ignore commands
+  if (text.startsWith("/")) return;
+
+  // Only private chats
+  if (ctx.chat.type !== "private") return;
+
+  const clarifyReplies = [
+    "Could you tell me a bit more?",
+    "I’m listening — can you expand?",
+    "What would you like to know?",
+  ];
+
+  // filter out emoji or short text
+  if (text.length < 4 || /^[\p{Emoji}\s]+$/u.test(text)) {
+    return ctx.reply(
+      clarifyReplies[Math.floor(Math.random() * clarifyReplies.length)]
+    );
+  }
+
+  try {
+    await ctx.replyWithChatAction("typing");
+
+    const reply = await askGemini(text);
+
+    // Telegram safety limit
+    ctx.reply(reply.slice(0, 5000));
+  } catch (err) {
+    console.error(err);
+    ctx.reply("I'm having trouble thinking right now.");
+  }
+});
