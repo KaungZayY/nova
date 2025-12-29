@@ -1,5 +1,5 @@
 import { Telegraf } from "telegraf";
-import { askGemini } from "./ai.js";
+import { askGemini, summarizeHistory } from "./ai.js";
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
@@ -10,7 +10,15 @@ bot.start((ctx) => {
 
 // /help command
 bot.help((ctx) => {
-  ctx.reply("Available commands:\n/start\n/help\n/weather (city name)");
+  ctx.reply(
+    "*Nova Help*\n\n" +
+      "/start – Start the bot and see a greeting\n" +
+      "/weather <city> – Get the current weather for a city\n" +
+      "/reset – Clear conversation memory and start fresh\n" +
+      "/help – Show this help message\n\n" +
+      "You can also chat with me normally — just send a message!",
+    { parse_mode: "Markdown" }
+  );
 });
 
 bot.command("weather", async (ctx) => {
@@ -20,7 +28,7 @@ bot.command("weather", async (ctx) => {
   }
   try {
     await ctx.replyWithChatAction("typing");
-    
+
     // Geocoding: city -> lat/lon, to set param api call
     const geoRes = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
@@ -84,6 +92,32 @@ console.log("🤖 Bot is running...");
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
 
+// ===== USER MEMORY =====
+const memory = new Map();
+
+function getMemory(userId) {
+  if (!memory.has(userId)) {
+    memory.set(userId, {
+      summary: "",
+      history: [],
+    });
+  }
+  return memory.get(userId);
+}
+const MAX_HISTORY = 10;
+const SUMMARY_TRIGGER = 14;
+
+// reset conversation
+bot.command("reset", (ctx) => {
+  const userId = ctx.from.id;
+  const mem = getMemory(userId);
+
+  mem.summary = "";
+  mem.history = [];
+
+  ctx.reply("Conversation memory has been reset.");
+});
+
 // Gemini AI
 bot.on("text", async (ctx) => {
   const text = ctx.message.text.trim();
@@ -107,13 +141,30 @@ bot.on("text", async (ctx) => {
     );
   }
 
+  const mem = getMemory(ctx.from.id);
+
   try {
     await ctx.replyWithChatAction("typing");
 
-    const reply = await askGemini(text);
+    const reply = await askGemini({
+      summary: mem.summary,
+      history: mem.history,
+      userMessage: text,
+    });
 
     // Telegram safety limit
-    ctx.reply(reply.slice(0, 5000));
+    ctx.reply(reply.slice(0, 4000));
+
+    mem.history.push(
+      { role: "user", parts: [{ text }] },
+      { role: "model", parts: [{ text: reply }] }
+    );
+
+    if (mem.history.length > SUMMARY_TRIGGER) {
+      const summary = await summarizeHistory(mem.history);
+      mem.summary = summary;
+      mem.history = mem.history.slice(-MAX_HISTORY);
+    }
   } catch (err) {
     console.error(err);
     ctx.reply("I'm having trouble thinking right now.");
