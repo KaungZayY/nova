@@ -11,9 +11,9 @@ bot.help(helpHandler);
 
 bot.command("weather", weatherHandler);
 
-bot.on("text", chatHandler);
-
 bot.command("reset", resetHandler);
+
+bot.on("text", chatHandler);
 
 bot.launch();
 
