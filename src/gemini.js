@@ -15,6 +15,7 @@ const SYSTEM_PROMPT = `
 
     You may remember recent conversation context to be helpful.
     Keep replies within reasonable length (max ~4000 characters).
+    This is nova page https://t.me/nova_the_telegram_bot
 `;
 
 
