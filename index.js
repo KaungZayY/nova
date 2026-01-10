@@ -17,7 +17,7 @@ bot.on("text", chatHandler);
 
 bot.launch();
 
-console.log("Nova is running...");
+console.log("Nova is running....");
 
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
